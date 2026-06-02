@@ -4,22 +4,54 @@ import Foundation
 struct WeekDisplay {
     let week: Int
     let weekYear: Int
+    let sprint: Int
+    let sprintYear: Int
     let date: Date
+
+    private static let sprintTimeZone = TimeZone(identifier: "Europe/Madrid") ?? .gmt
+    private static let sprintSwitchWeekday = 4
+    private static let sprintSwitchHour = 12
 
     static func current(date: Date = Date()) -> WeekDisplay {
         var calendar = Calendar(identifier: .iso8601)
-        calendar.timeZone = .autoupdatingCurrent
-        let sprintDate = calendar.date(byAdding: .day, value: 5, to: date) ?? date
+        calendar.timeZone = sprintTimeZone
+
+        let sprintEndDate = sprintEndDate(for: date, calendar: calendar)
 
         return WeekDisplay(
-            week: calendar.component(.weekOfYear, from: sprintDate),
-            weekYear: calendar.component(.yearForWeekOfYear, from: sprintDate),
+            week: calendar.component(.weekOfYear, from: date),
+            weekYear: calendar.component(.yearForWeekOfYear, from: date),
+            sprint: calendar.component(.weekOfYear, from: sprintEndDate),
+            sprintYear: calendar.component(.yearForWeekOfYear, from: sprintEndDate),
             date: date
         )
     }
 
+    private static func sprintEndDate(for date: Date, calendar: Calendar) -> Date {
+        let startOfDay = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: date)
+        let daysToSwitchDay = sprintSwitchWeekday - weekday
+        let switchDay = calendar.date(byAdding: .day, value: daysToSwitchDay, to: startOfDay) ?? startOfDay
+        let switchMoment = calendar.date(
+            bySettingHour: sprintSwitchHour,
+            minute: 0,
+            second: 0,
+            of: switchDay
+        ) ?? switchDay
+
+        if date < switchMoment {
+            return switchMoment
+        }
+
+        return calendar.date(byAdding: .day, value: 7, to: switchMoment) ?? switchMoment
+    }
+
     var menuBarTitle: String {
-        "KW \(week)"
+        "SP\(sprint)-KW\(week)"
+    }
+
+    var sprintSummary: String {
+        "Sprint \(sprint) · Switches Wed 12:00 Europe/Madrid"
     }
 
     var weekSummary: String {
@@ -27,17 +59,22 @@ struct WeekDisplay {
     }
 
     var copyLabel: String {
-        "KW \(week)"
+        menuBarTitle
     }
 
     var yearSummary: String {
-        "ISO week year \(weekYear)"
+        if sprintYear == weekYear {
+            return "ISO week year \(weekYear)"
+        }
+
+        return "ISO week year \(weekYear) · Sprint year \(sprintYear)"
     }
 
     var todaySummary: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .full
         formatter.timeStyle = .none
+        formatter.timeZone = Self.sprintTimeZone
         return formatter.string(from: date)
     }
 }
@@ -107,13 +144,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         button.title = currentDisplay.menuBarTitle
-        button.toolTip = "\(currentDisplay.weekSummary) · \(currentDisplay.yearSummary)"
+        button.toolTip = "\(currentDisplay.sprintSummary) · \(currentDisplay.weekSummary) · \(currentDisplay.yearSummary)"
         statusItem.menu = makeMenu()
     }
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
 
+        menu.addItem(disabledItem(currentDisplay.sprintSummary))
         menu.addItem(disabledItem(currentDisplay.weekSummary))
         menu.addItem(disabledItem(currentDisplay.yearSummary))
         menu.addItem(disabledItem(currentDisplay.todaySummary))
@@ -128,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(copyNumberItem)
 
         let copyLabelItem = NSMenuItem(
-            title: "Copy KW Label",
+            title: "Copy SP-KW Label",
             action: #selector(copyWeekLabel),
             keyEquivalent: ""
         )
