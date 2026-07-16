@@ -9,10 +9,11 @@ struct WeekDisplay {
     static func current(date: Date = Date()) -> WeekDisplay {
         var calendar = Calendar(identifier: .iso8601)
         calendar.timeZone = .autoupdatingCurrent
+        let sprintDate = calendar.date(byAdding: .day, value: 5, to: date) ?? date
 
         return WeekDisplay(
-            week: calendar.component(.weekOfYear, from: date),
-            weekYear: calendar.component(.yearForWeekOfYear, from: date),
+            week: calendar.component(.weekOfYear, from: sprintDate),
+            weekYear: calendar.component(.yearForWeekOfYear, from: sprintDate),
             date: date
         )
     }
