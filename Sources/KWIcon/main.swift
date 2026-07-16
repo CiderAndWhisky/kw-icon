@@ -80,6 +80,11 @@ struct WeekDisplay {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private enum PreferenceKey {
+        static let showsSprintAndWeek = "showsSprintAndWeek"
+        static let showsSprintNumber = "showsSprintNumber"
+    }
+
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var refreshTimer: Timer?
     private var currentDisplay = WeekDisplay.current()
@@ -143,9 +148,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        button.title = currentDisplay.menuBarTitle
+        button.title = displayTitle
         button.toolTip = "\(currentDisplay.sprintSummary) · \(currentDisplay.weekSummary) · \(currentDisplay.yearSummary)"
         statusItem.menu = makeMenu()
+    }
+
+    private var displayTitle: String {
+        if UserDefaults.standard.bool(forKey: PreferenceKey.showsSprintAndWeek) {
+            return currentDisplay.menuBarTitle
+        }
+
+        let number = UserDefaults.standard.bool(forKey: PreferenceKey.showsSprintNumber)
+            ? currentDisplay.sprint
+            : currentDisplay.week
+        return "KW \(number)"
     }
 
     private func makeMenu() -> NSMenu {
@@ -157,6 +173,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(disabledItem(currentDisplay.todaySummary))
         menu.addItem(.separator())
 
+        let sprintAndWeekItem = NSMenuItem(
+            title: "Show Sprint + ISO Week",
+            action: #selector(toggleSprintAndWeek),
+            keyEquivalent: ""
+        )
+        sprintAndWeekItem.target = self
+        sprintAndWeekItem.state = UserDefaults.standard.bool(forKey: PreferenceKey.showsSprintAndWeek) ? .on : .off
+        menu.addItem(sprintAndWeekItem)
+
+        let sprintNumberItem = NSMenuItem(
+            title: "Use Sprint Number",
+            action: #selector(toggleSprintNumber),
+            keyEquivalent: ""
+        )
+        sprintNumberItem.target = self
+        sprintNumberItem.isEnabled = !UserDefaults.standard.bool(forKey: PreferenceKey.showsSprintAndWeek)
+        sprintNumberItem.state = UserDefaults.standard.bool(forKey: PreferenceKey.showsSprintNumber) ? .on : .off
+        menu.addItem(sprintNumberItem)
+        menu.addItem(.separator())
+
         let copyNumberItem = NSMenuItem(
             title: "Copy Week Number",
             action: #selector(copyWeekNumber),
@@ -166,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(copyNumberItem)
 
         let copyLabelItem = NSMenuItem(
-            title: "Copy SP-KW Label",
+            title: "Copy Display Label",
             action: #selector(copyWeekLabel),
             keyEquivalent: ""
         )
@@ -199,7 +235,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func copyWeekLabel() {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(currentDisplay.copyLabel, forType: .string)
+        NSPasteboard.general.setString(displayTitle, forType: .string)
+    }
+
+    @objc private func toggleSprintAndWeek() {
+        let defaults = UserDefaults.standard
+        defaults.set(!defaults.bool(forKey: PreferenceKey.showsSprintAndWeek), forKey: PreferenceKey.showsSprintAndWeek)
+        refresh()
+    }
+
+    @objc private func toggleSprintNumber() {
+        let defaults = UserDefaults.standard
+        defaults.set(!defaults.bool(forKey: PreferenceKey.showsSprintNumber), forKey: PreferenceKey.showsSprintNumber)
+        refresh()
     }
 
     @objc private func quit() {
